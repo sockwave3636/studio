@@ -1,6 +1,6 @@
 'use client';
 
-import type { Symptom, MedicalHistory } from '@/services/medical-diagnosis';
+import type { Symptom, MedicalHistory, PatientProfile } from '@/services/medical-diagnosis';
 import type { AnalyzeSymptomsInput, AnalyzeSymptomsOutput } from '@/ai/flows/analyze-symptoms';
 import { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -29,14 +29,30 @@ const medicalHistorySchema = z.object({
 });
 
 const formSchema = z.object({
-  age: z.coerce.number().int().positive('Age must be a positive number.').min(1, 'Age is required.'), // Added age field
+  name: z.string().min(1, 'Name is required.'),
+  age: z.coerce.number().int().positive('Age must be a positive number.').min(1, 'Age is required.'),
+  weight: z.coerce.number().positive('Weight must be positive').optional(),
+  weightUnit: z.string().optional(),
+  height: z.coerce.number().positive('Height must be positive').optional(),
+  heightUnit: z.string().optional(),
+  gender: z.string().min(1, 'Gender is required.'),
   symptoms: z.array(symptomSchema).min(1, 'Please add at least one symptom.'),
   medicalHistory: medicalHistorySchema,
+}).refine(data => (data.weight ? !!data.weightUnit : true), {
+    message: "Weight unit is required if weight is provided.",
+    path: ["weightUnit"],
+}).refine(data => (data.height ? !!data.heightUnit : true), {
+    message: "Height unit is required if height is provided.",
+    path: ["heightUnit"],
 });
+
 
 type FormData = z.infer<typeof formSchema>;
 
 const severityLevels = ["Mild", "Moderate", "Severe", "Very Severe"];
+const genderOptions = ["Male", "Female", "Other", "Prefer not to say"];
+const weightUnits = ["kg", "lbs"];
+const heightUnits = ["cm", "in", "ft"]; // Added 'ft' for potential conversion later if needed
 
 export function SymptomForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -46,7 +62,13 @@ export function SymptomForm() {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      age: undefined, // Initialize age
+      name: '',
+      age: undefined,
+      weight: undefined,
+      weightUnit: undefined,
+      height: undefined,
+      heightUnit: undefined,
+      gender: '',
       symptoms: [{ name: '', severity: '' }],
       medicalHistory: {
         pastConditions: '',
@@ -72,7 +94,13 @@ export function SymptomForm() {
     };
 
     const input: AnalyzeSymptomsInput = {
-      age: data.age, // Pass age
+      name: data.name,
+      age: data.age,
+      weight: data.weight,
+      weightUnit: data.weightUnit,
+      height: data.height,
+      heightUnit: data.heightUnit,
+      gender: data.gender,
       symptoms: data.symptoms,
       medicalHistory: formattedMedicalHistory,
     };
@@ -94,26 +122,147 @@ export function SymptomForm() {
         <CardHeader className="bg-secondary">
           <CardTitle className="text-2xl font-semibold text-secondary-foreground">Symptom Checker</CardTitle>
           <CardDescription className="text-secondary-foreground/80">
-            Enter your age, symptoms, and medical history below. Our AI will provide potential conditions based on your input.
+            Enter your details, symptoms, and medical history below. Our AI will provide potential conditions based on your input.
           </CardDescription>
         </CardHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="space-y-6 p-6">
-              {/* Age Section */}
-              <FormField
-                control={form.control}
-                name="age"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Age</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="Enter your age" {...field} onChange={event => field.onChange(+event.target.value)} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Profile Section */}
+              <div className="space-y-4">
+                 <Label className="text-lg font-medium">Your Information</Label>
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Name</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Enter your name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                 />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="age"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Age</FormLabel>
+                            <FormControl>
+                            <Input type="number" placeholder="Enter your age" {...field} onChange={event => field.onChange(event.target.value === '' ? undefined : +event.target.value)} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                     <FormField
+                        control={form.control}
+                        name="gender"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Gender</FormLabel>
+                             <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select gender" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {genderOptions.map((option) => (
+                                    <SelectItem key={option} value={option}>
+                                      {option}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     <FormField
+                        control={form.control}
+                        name="weight"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Weight (Optional)</FormLabel>
+                            <FormControl>
+                             <Input type="number" placeholder="Enter weight" {...field} onChange={event => field.onChange(event.target.value === '' ? undefined : +event.target.value)} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                     <FormField
+                        control={form.control}
+                        name="weightUnit"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Weight Unit</FormLabel>
+                             <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!form.watch('weight')}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select unit" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {weightUnits.map((unit) => (
+                                    <SelectItem key={unit} value={unit}>
+                                      {unit}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                 </div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     <FormField
+                        control={form.control}
+                        name="height"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Height (Optional)</FormLabel>
+                            <FormControl>
+                            <Input type="number" placeholder="Enter height" {...field} onChange={event => field.onChange(event.target.value === '' ? undefined : +event.target.value)} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                     <FormField
+                        control={form.control}
+                        name="heightUnit"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Height Unit</FormLabel>
+                             <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!form.watch('height')}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select unit" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {heightUnits.map((unit) => (
+                                    <SelectItem key={unit} value={unit}>
+                                      {unit}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                </div>
+              </div>
+
 
               {/* Symptoms Section */}
               <div className="space-y-4 pt-4 border-t">

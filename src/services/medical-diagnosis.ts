@@ -27,6 +27,41 @@ export interface MedicalHistory {
 }
 
 /**
+ * Represents basic patient profile information.
+ */
+export interface PatientProfile {
+  /**
+   * The name of the user.
+   */
+  name: string;
+  /**
+   * The age of the user.
+   */
+  age: number;
+   /**
+   * The weight of the user.
+   */
+  weight?: number;
+  /**
+   * The unit for the weight (e.g., 'kg', 'lbs').
+   */
+  weightUnit?: string;
+  /**
+   * The height of the user.
+   */
+  height?: number;
+  /**
+   * The unit for the height (e.g., 'cm', 'in').
+   */
+  heightUnit?: string;
+  /**
+   * The gender of the user.
+   */
+  gender: string;
+}
+
+
+/**
  * Represents a possible diagnosis with a condition name and confidence level.
  */
 export interface Diagnosis {
@@ -41,19 +76,19 @@ export interface Diagnosis {
 }
 
 /**
- * Asynchronously retrieves possible diagnoses based on user-inputted age, symptoms, and medical history.
+ * Asynchronously retrieves possible diagnoses based on user-inputted profile, symptoms, and medical history.
  *
- * @param age The age of the user.
+ * @param profile The basic profile of the user (name, age, weight, height, gender).
  * @param symptoms A list of symptoms provided by the user.
  * @param medicalHistory The user's medical history information.
  * @returns A promise that resolves to a list of possible diagnoses.
  */
-export async function getDiagnosis(age: number, symptoms: Symptom[], medicalHistory: MedicalHistory): Promise<Diagnosis[]> {
+export async function getDiagnosis(profile: PatientProfile, symptoms: Symptom[], medicalHistory: MedicalHistory): Promise<Diagnosis[]> {
   // TODO: Implement this by calling an external API.
-  // The API call should now include the age parameter.
-  console.log(`Getting diagnosis for age: ${age}, symptoms:`, symptoms, 'medical history:', medicalHistory);
+  // The API call should now include all profile parameters.
+  console.log(`Getting diagnosis for profile:`, profile, 'symptoms:', symptoms, 'medical history:', medicalHistory);
 
-  // Example mock response (can be adjusted based on age or other inputs)
+  // Example mock response (can be adjusted based on profile or other inputs)
   const mockDiagnoses = [
     {
       condition: 'Common Cold',
@@ -65,16 +100,28 @@ export async function getDiagnosis(age: number, symptoms: Symptom[], medicalHist
     },
   ];
 
-  if (age < 18) {
+  if (profile.age < 18) {
     mockDiagnoses.push({
       condition: 'Pediatric Viral Infection',
       confidence: 'Low',
     });
-  } else if (age > 65) {
+  } else if (profile.age > 65) {
      mockDiagnoses.push({
       condition: 'Age-related Condition Check',
       confidence: 'Low',
     });
+  }
+
+  if (profile.gender === 'Female' && profile.age > 18 && profile.age < 50) {
+      // Example: Add a female-specific condition check for relevant age group
+      // mockDiagnoses.push({ condition: 'Hormonal Imbalance check', confidence: 'Low' });
+  }
+
+  // Example: Adjust confidence based on weight/height (e.g., BMI calculation)
+  // This is highly simplified
+  if (profile.weight && profile.height && profile.weightUnit && profile.heightUnit) {
+      // Potentially calculate BMI and adjust likelihoods
+      // console.log('BMI could be calculated here');
   }
 
 

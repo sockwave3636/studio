@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * @fileOverview Analyzes user-provided symptoms, age, and medical history to provide a list of possible diagnoses.
+ * @fileOverview Analyzes user-provided symptoms, profile, and medical history to provide a list of possible diagnoses.
  *
  * - analyzeSymptoms - A function that handles the symptom analysis process.
  * - AnalyzeSymptomsInput - The input type for the analyzeSymptoms function.
@@ -10,10 +10,16 @@
 
 import {ai} from '@/ai/ai-instance';
 import {z} from 'genkit';
-import {Diagnosis, getDiagnosis, MedicalHistory, Symptom} from '@/services/medical-diagnosis';
+import {Diagnosis, getDiagnosis, MedicalHistory, PatientProfile, Symptom} from '@/services/medical-diagnosis';
 
 const AnalyzeSymptomsInputSchema = z.object({
+  name: z.string().describe('The name of the user.'),
   age: z.number().int().positive().describe('The age of the user.'),
+  weight: z.number().positive().optional().describe('The weight of the user.'),
+  weightUnit: z.string().optional().describe('The unit for the weight (e.g., kg, lbs).'),
+  height: z.number().positive().optional().describe('The height of the user.'),
+  heightUnit: z.string().optional().describe('The unit for the height (e.g., cm, in).'),
+  gender: z.string().describe('The gender of the user.'),
   symptoms: z
     .array(z.object({
       name: z.string().describe('The name of the symptom.'),
@@ -47,7 +53,13 @@ const prompt = ai.definePrompt({
   name: 'analyzeSymptomsPrompt',
   input: {
     schema: z.object({
-      age: z.number().int().positive().describe('The age of the user.'), // Added age to prompt input
+      name: z.string().describe('The name of the user.'),
+      age: z.number().int().positive().describe('The age of the user.'),
+      weight: z.number().positive().optional().describe('The weight of the user.'),
+      weightUnit: z.string().optional().describe('The unit for the weight (e.g., kg, lbs).'),
+      height: z.number().positive().optional().describe('The height of the user.'),
+      heightUnit: z.string().optional().describe('The unit for the height (e.g., cm, in).'),
+      gender: z.string().describe('The gender of the user.'),
       symptoms: z
         .array(z.object({
           name: z.string().describe('The name of the symptom.'),
@@ -72,8 +84,8 @@ const prompt = ai.definePrompt({
         .describe('A list of possible diagnoses, ranked by likelihood.'),
     }),
   },
-  // Updated prompt to include age
-  prompt: `Based on the following information, provide a list of possible diagnoses ranked by likelihood.\n\nAge: {{age}}\n\nSymptoms:\n{{#each symptoms}}\n- {{this.name}} (Severity: {{this.severity}})\n{{/each}}\n\nMedical History:\n- Past Conditions: {{#each medicalHistory.pastConditions}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}\n- Current Medications: {{#each medicalHistory.currentMedications}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}\n\nDiagnoses: `,
+  // Updated prompt to include all profile fields
+  prompt: `Based on the following information for {{name}}, provide a list of possible diagnoses ranked by likelihood.\n\nProfile:\n- Age: {{age}}\n- Gender: {{gender}}{{#if weight}}\n- Weight: {{weight}} {{weightUnit}}{{/if}}{{#if height}}\n- Height: {{height}} {{heightUnit}}{{/if}}\n\nSymptoms:\n{{#each symptoms}}\n- {{this.name}} (Severity: {{this.severity}})\n{{/each}}\n\nMedical History:\n- Past Conditions: {{#if medicalHistory.pastConditions}}{{join medicalHistory.pastConditions ", "}}{{else}}None reported{{/if}}\n- Current Medications: {{#if medicalHistory.currentMedications}}{{join medicalHistory.currentMedications ", "}}{{else}}None reported{{/if}}\n\nDiagnoses: `,
 });
 
 const analyzeSymptomsFlow = ai.defineFlow<
@@ -84,12 +96,33 @@ const analyzeSymptomsFlow = ai.defineFlow<
   inputSchema: AnalyzeSymptomsInputSchema,
   outputSchema: AnalyzeSymptomsOutputSchema,
 }, async input => {
-  // Call the external getDiagnosis API, now passing age as well.
-  const diagnoses: Diagnosis[] = await getDiagnosis(input.age, input.symptoms, input.medicalHistory);
+  // Prepare profile data for the service call
+  const profile: PatientProfile = {
+      name: input.name,
+      age: input.age,
+      weight: input.weight,
+      weightUnit: input.weightUnit,
+      height: input.height,
+      heightUnit: input.heightUnit,
+      gender: input.gender,
+  };
+
+  // Call the external getDiagnosis API, passing the full profile.
+  const diagnoses: Diagnosis[] = await getDiagnosis(profile, input.symptoms, input.medicalHistory);
+
   // Format the diagnoses to conform with the schema.
   // In a real scenario, the prompt call might happen here, using the diagnoses from the service as context or validation.
-  // For this example, we'll return the service response directly.
+  // Or the prompt could directly generate the diagnoses if no external service is used.
+  // For this example, we'll return the service response directly formatted.
+  // If using the prompt to generate:
   // const {output} = await prompt(input);
   // return output!;
   return { diagnoses };
 });
+
+// Helper function for Handlebars (if not natively supported or desired)
+function join(arr: string[], separator: string): string {
+    return arr.join(separator);
+}
+// Register the helper if needed (Genkit/Handlebars setup might vary)
+// Handlebars.registerHelper('join', join);
