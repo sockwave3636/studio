@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * @fileOverview Analyzes user-provided symptoms, profile, and medical history to provide a list of possible diagnoses.
+ * @fileOverview Analyzes user-provided symptoms, profile, medical history, and optional medical images (MRI/X-ray) to provide a list of possible diagnoses.
  *
  * - analyzeSymptoms - A function that handles the symptom analysis process.
  * - AnalyzeSymptomsInput - The input type for the analyzeSymptoms function.
@@ -32,6 +32,9 @@ const AnalyzeSymptomsInputSchema = z.object({
       currentMedications: z.array(z.string()).describe('A list of current medications.'),
     })
     .describe('The user\'s medical history information.'),
+   imageDataUri: z.string().optional().describe(
+      "Optional medical image (like MRI or X-ray) as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+    ),
 });
 export type AnalyzeSymptomsInput = z.infer<typeof AnalyzeSymptomsInputSchema>;
 
@@ -52,41 +55,38 @@ export async function analyzeSymptoms(input: AnalyzeSymptomsInput): Promise<Anal
 const prompt = ai.definePrompt({
   name: 'analyzeSymptomsPrompt',
   input: {
-    schema: z.object({
-      name: z.string().describe('The name of the user.'),
-      age: z.number().int().positive().describe('The age of the user.'),
-      weight: z.number().positive().optional().describe('The weight of the user.'),
-      weightUnit: z.string().optional().describe('The unit for the weight (e.g., kg, lbs).'),
-      height: z.number().positive().optional().describe('The height of the user.'),
-      heightUnit: z.string().optional().describe('The unit for the height (e.g., cm, in).'),
-      gender: z.string().describe('The gender of the user.'),
-      symptoms: z
-        .array(z.object({
-          name: z.string().describe('The name of the symptom.'),
-          severity: z.string().describe('The severity level of the symptom (e.g., Mild, Moderate, Severe).'),
-        }))
-        .describe('A list of symptoms provided by the user.'),
-      medicalHistory: z
-        .object({
-          pastConditions: z.array(z.string()).describe('A list of past medical conditions.'),
-          currentMedications: z.array(z.string()).describe('A list of current medications.'),
-        })
-        .describe('The user\'s medical history information.'),
-    }),
+    schema: AnalyzeSymptomsInputSchema, // Use the updated schema directly
   },
   output: {
-    schema: z.object({
-      diagnoses: z
-        .array(z.object({
-          condition: z.string().describe('The name of the diagnosed condition.'),
-          confidence: z.string().describe('The confidence level of the diagnosis (e.g., High, Medium, Low).'),
-        }))
-        .describe('A list of possible diagnoses, ranked by likelihood.'),
-    }),
+    schema: AnalyzeSymptomsOutputSchema, // Use the existing output schema
   },
-  // Updated prompt to include all profile fields
-  prompt: `Based on the following information for {{name}}, provide a list of possible diagnoses ranked by likelihood.\n\nProfile:\n- Age: {{age}}\n- Gender: {{gender}}{{#if weight}}\n- Weight: {{weight}} {{weightUnit}}{{/if}}{{#if height}}\n- Height: {{height}} {{heightUnit}}{{/if}}\n\nSymptoms:\n{{#each symptoms}}\n- {{this.name}} (Severity: {{this.severity}})\n{{/each}}\n\nMedical History:\n- Past Conditions: {{#if medicalHistory.pastConditions}}{{join medicalHistory.pastConditions ", "}}{{else}}None reported{{/if}}\n- Current Medications: {{#if medicalHistory.currentMedications}}{{join medicalHistory.currentMedications ", "}}{{else}}None reported{{/if}}\n\nDiagnoses: `,
+  // Updated prompt to include all profile fields and the optional image
+  prompt: `You are a medical AI assistant. Analyze the following information for patient {{name}} to provide a list of possible diagnoses ranked by likelihood. Consider the symptoms, medical history, and the provided medical image (if any).
+
+Profile:
+- Age: {{age}}
+- Gender: {{gender}}{{#if weight}}
+- Weight: {{weight}} {{weightUnit}}{{/if}}{{#if height}}
+- Height: {{height}} {{heightUnit}}{{/if}}
+
+Symptoms:
+{{#each symptoms}}
+- {{this.name}} (Severity: {{this.severity}})
+{{/each}}
+
+Medical History:
+- Past Conditions: {{#if medicalHistory.pastConditions}}{{join medicalHistory.pastConditions ", "}}{{else}}None reported{{/if}}
+- Current Medications: {{#if medicalHistory.currentMedications}}{{join medicalHistory.currentMedications ", "}}{{else}}None reported{{/if}}
+
+{{#if imageDataUri}}
+Medical Image Analysis:
+Please analyze the provided medical image (MRI, X-ray, etc.) for any abnormalities or relevant findings.
+Image: {{media url=imageDataUri}}
+{{/if}}
+
+Based on all the available information (profile, symptoms, history, and image analysis if provided), list the possible diagnoses:`,
 });
+
 
 const analyzeSymptomsFlow = ai.defineFlow<
   typeof AnalyzeSymptomsInputSchema,
@@ -96,7 +96,13 @@ const analyzeSymptomsFlow = ai.defineFlow<
   inputSchema: AnalyzeSymptomsInputSchema,
   outputSchema: AnalyzeSymptomsOutputSchema,
 }, async input => {
-  // Prepare profile data for the service call
+
+  // Call the Genkit prompt which now includes image analysis capability
+  const {output} = await prompt(input);
+
+  // Optionally, you could still call the external service for non-image related diagnosis components
+  // and potentially combine the results, but for simplicity, we rely on the prompt for now.
+  /*
   const profile: PatientProfile = {
       name: input.name,
       age: input.age,
@@ -106,23 +112,19 @@ const analyzeSymptomsFlow = ai.defineFlow<
       heightUnit: input.heightUnit,
       gender: input.gender,
   };
+  const serviceDiagnoses: Diagnosis[] = await getDiagnosis(profile, input.symptoms, input.medicalHistory);
+  */
 
-  // Call the external getDiagnosis API, passing the full profile.
-  const diagnoses: Diagnosis[] = await getDiagnosis(profile, input.symptoms, input.medicalHistory);
-
-  // Format the diagnoses to conform with the schema.
-  // In a real scenario, the prompt call might happen here, using the diagnoses from the service as context or validation.
-  // Or the prompt could directly generate the diagnoses if no external service is used.
-  // For this example, we'll return the service response directly formatted.
-  // If using the prompt to generate:
-  // const {output} = await prompt(input);
-  // return output!;
-  return { diagnoses };
+  // Return the diagnoses generated by the AI prompt
+  return output!; // Output should conform to AnalyzeSymptomsOutputSchema
 });
 
 // Helper function for Handlebars (if not natively supported or desired)
+// Note: Genkit's Handlebars support might have built-in helpers. This is a fallback.
 function join(arr: string[], separator: string): string {
     return arr.join(separator);
 }
 // Register the helper if needed (Genkit/Handlebars setup might vary)
+// Example (might not be required depending on Genkit version/setup):
+// import Handlebars from 'handlebars'; // Hypothetical import
 // Handlebars.registerHelper('join', join);

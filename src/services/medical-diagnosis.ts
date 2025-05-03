@@ -77,53 +77,47 @@ export interface Diagnosis {
 
 /**
  * Asynchronously retrieves possible diagnoses based on user-inputted profile, symptoms, and medical history.
+ * Note: This function is currently NOT used for image analysis, which is handled by the Genkit flow.
+ * It can be used for supplemental, non-image based diagnosis logic or calls to other APIs.
  *
  * @param profile The basic profile of the user (name, age, weight, height, gender).
  * @param symptoms A list of symptoms provided by the user.
  * @param medicalHistory The user's medical history information.
- * @returns A promise that resolves to a list of possible diagnoses.
+ * @returns A promise that resolves to a list of possible diagnoses based on non-image data.
  */
 export async function getDiagnosis(profile: PatientProfile, symptoms: Symptom[], medicalHistory: MedicalHistory): Promise<Diagnosis[]> {
-  // TODO: Implement this by calling an external API.
-  // The API call should now include all profile parameters.
-  console.log(`Getting diagnosis for profile:`, profile, 'symptoms:', symptoms, 'medical history:', medicalHistory);
+  // TODO: Implement this by calling an external API if needed for non-image related checks.
+  // The main diagnosis including image analysis happens in the Genkit flow.
+  console.log(`(Service Call - Non-Image) Getting diagnosis for profile:`, profile, 'symptoms:', symptoms, 'medical history:', medicalHistory);
 
   // Example mock response (can be adjusted based on profile or other inputs)
-  const mockDiagnoses = [
-    {
-      condition: 'Common Cold',
-      confidence: 'High',
-    },
-    {
-      condition: 'Flu',
-      confidence: 'Medium',
-    },
-  ];
+  // This might provide baseline suggestions or cross-checks.
+  const mockDiagnoses: Diagnosis[] = []; // Start empty, as the main analysis is in the flow
+
+  // Example logic: Add a baseline check if certain criteria met
+  if (symptoms.some(s => s.name.toLowerCase().includes('fever')) && symptoms.some(s => s.name.toLowerCase().includes('cough'))) {
+     mockDiagnoses.push({
+        condition: 'Potential Respiratory Issue (Service Check)',
+        confidence: 'Low', // Confidence might be low as it doesn't consider the image
+     });
+  }
+
 
   if (profile.age < 18) {
-    mockDiagnoses.push({
-      condition: 'Pediatric Viral Infection',
-      confidence: 'Low',
-    });
+    // mockDiagnoses.push({
+    //   condition: 'Pediatric Check (Service)',
+    //   confidence: 'Low',
+    // });
   } else if (profile.age > 65) {
-     mockDiagnoses.push({
-      condition: 'Age-related Condition Check',
-      confidence: 'Low',
-    });
+    //  mockDiagnoses.push({
+    //   condition: 'Geriatric Check (Service)',
+    //   confidence: 'Low',
+    // });
   }
 
-  if (profile.gender === 'Female' && profile.age > 18 && profile.age < 50) {
-      // Example: Add a female-specific condition check for relevant age group
-      // mockDiagnoses.push({ condition: 'Hormonal Imbalance check', confidence: 'Low' });
-  }
-
-  // Example: Adjust confidence based on weight/height (e.g., BMI calculation)
-  // This is highly simplified
-  if (profile.weight && profile.height && profile.weightUnit && profile.heightUnit) {
-      // Potentially calculate BMI and adjust likelihoods
-      // console.log('BMI could be calculated here');
-  }
-
-
+  // This function's results might be merged with the AI flow's results later if needed.
+  // For now, the primary analysis (including image) relies on the Genkit flow.
+  console.log("(Service Call - Non-Image) Mock diagnoses:", mockDiagnoses)
   return mockDiagnoses;
 }
+```
