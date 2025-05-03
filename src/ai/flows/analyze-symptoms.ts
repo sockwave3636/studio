@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * @fileOverview Analyzes user-provided symptoms and medical history to provide a list of possible diagnoses.
+ * @fileOverview Analyzes user-provided symptoms, age, and medical history to provide a list of possible diagnoses.
  *
  * - analyzeSymptoms - A function that handles the symptom analysis process.
  * - AnalyzeSymptomsInput - The input type for the analyzeSymptoms function.
@@ -13,6 +13,7 @@ import {z} from 'genkit';
 import {Diagnosis, getDiagnosis, MedicalHistory, Symptom} from '@/services/medical-diagnosis';
 
 const AnalyzeSymptomsInputSchema = z.object({
+  age: z.number().int().positive().describe('The age of the user.'),
   symptoms: z
     .array(z.object({
       name: z.string().describe('The name of the symptom.'),
@@ -46,6 +47,7 @@ const prompt = ai.definePrompt({
   name: 'analyzeSymptomsPrompt',
   input: {
     schema: z.object({
+      age: z.number().int().positive().describe('The age of the user.'), // Added age to prompt input
       symptoms: z
         .array(z.object({
           name: z.string().describe('The name of the symptom.'),
@@ -70,7 +72,8 @@ const prompt = ai.definePrompt({
         .describe('A list of possible diagnoses, ranked by likelihood.'),
     }),
   },
-  prompt: `Based on the following symptoms and medical history, provide a list of possible diagnoses ranked by likelihood.\n\nSymptoms:\n{{#each symptoms}}\n- {{this.name}} (Severity: {{this.severity}})\n{{/each}}\n\nMedical History:\n- Past Conditions: {{#each medicalHistory.pastConditions}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}\n- Current Medications: {{#each medicalHistory.currentMedications}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}\n\nDiagnoses: `,
+  // Updated prompt to include age
+  prompt: `Based on the following information, provide a list of possible diagnoses ranked by likelihood.\n\nAge: {{age}}\n\nSymptoms:\n{{#each symptoms}}\n- {{this.name}} (Severity: {{this.severity}})\n{{/each}}\n\nMedical History:\n- Past Conditions: {{#each medicalHistory.pastConditions}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}\n- Current Medications: {{#each medicalHistory.currentMedications}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}\n\nDiagnoses: `,
 });
 
 const analyzeSymptomsFlow = ai.defineFlow<
@@ -81,8 +84,12 @@ const analyzeSymptomsFlow = ai.defineFlow<
   inputSchema: AnalyzeSymptomsInputSchema,
   outputSchema: AnalyzeSymptomsOutputSchema,
 }, async input => {
-  // Call the external getDiagnosis API.
-  const diagnoses: Diagnosis[] = await getDiagnosis(input.symptoms, input.medicalHistory);
+  // Call the external getDiagnosis API, now passing age as well.
+  const diagnoses: Diagnosis[] = await getDiagnosis(input.age, input.symptoms, input.medicalHistory);
   // Format the diagnoses to conform with the schema.
+  // In a real scenario, the prompt call might happen here, using the diagnoses from the service as context or validation.
+  // For this example, we'll return the service response directly.
+  // const {output} = await prompt(input);
+  // return output!;
   return { diagnoses };
 });

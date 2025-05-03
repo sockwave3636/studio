@@ -29,6 +29,7 @@ const medicalHistorySchema = z.object({
 });
 
 const formSchema = z.object({
+  age: z.coerce.number().int().positive('Age must be a positive number.').min(1, 'Age is required.'), // Added age field
   symptoms: z.array(symptomSchema).min(1, 'Please add at least one symptom.'),
   medicalHistory: medicalHistorySchema,
 });
@@ -45,6 +46,7 @@ export function SymptomForm() {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      age: undefined, // Initialize age
       symptoms: [{ name: '', severity: '' }],
       medicalHistory: {
         pastConditions: '',
@@ -70,6 +72,7 @@ export function SymptomForm() {
     };
 
     const input: AnalyzeSymptomsInput = {
+      age: data.age, // Pass age
       symptoms: data.symptoms,
       medicalHistory: formattedMedicalHistory,
     };
@@ -91,14 +94,29 @@ export function SymptomForm() {
         <CardHeader className="bg-secondary">
           <CardTitle className="text-2xl font-semibold text-secondary-foreground">Symptom Checker</CardTitle>
           <CardDescription className="text-secondary-foreground/80">
-            Enter your symptoms and medical history below. Our AI will provide potential conditions based on your input.
+            Enter your age, symptoms, and medical history below. Our AI will provide potential conditions based on your input.
           </CardDescription>
         </CardHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="space-y-6 p-6">
+              {/* Age Section */}
+              <FormField
+                control={form.control}
+                name="age"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Age</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="Enter your age" {...field} onChange={event => field.onChange(+event.target.value)} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* Symptoms Section */}
-              <div className="space-y-4">
+              <div className="space-y-4 pt-4 border-t">
                 <Label className="text-lg font-medium">Symptoms</Label>
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex items-start space-x-3 p-4 border rounded-md bg-card">
@@ -168,6 +186,11 @@ export function SymptomForm() {
                      {form.formState.errors.symptoms.message || "Please add at least one symptom."}
                    </p>
                 )}
+                 {form.formState.errors.symptoms?.root && (
+                   <p className="text-sm font-medium text-destructive">
+                     {form.formState.errors.symptoms.root.message}
+                   </p>
+                 )}
               </div>
 
               {/* Medical History Section */}

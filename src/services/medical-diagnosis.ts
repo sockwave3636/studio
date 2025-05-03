@@ -41,16 +41,20 @@ export interface Diagnosis {
 }
 
 /**
- * Asynchronously retrieves possible diagnoses based on user-inputted symptoms and medical history.
+ * Asynchronously retrieves possible diagnoses based on user-inputted age, symptoms, and medical history.
  *
+ * @param age The age of the user.
  * @param symptoms A list of symptoms provided by the user.
  * @param medicalHistory The user's medical history information.
  * @returns A promise that resolves to a list of possible diagnoses.
  */
-export async function getDiagnosis(symptoms: Symptom[], medicalHistory: MedicalHistory): Promise<Diagnosis[]> {
+export async function getDiagnosis(age: number, symptoms: Symptom[], medicalHistory: MedicalHistory): Promise<Diagnosis[]> {
   // TODO: Implement this by calling an external API.
+  // The API call should now include the age parameter.
+  console.log(`Getting diagnosis for age: ${age}, symptoms:`, symptoms, 'medical history:', medicalHistory);
 
-  return [
+  // Example mock response (can be adjusted based on age or other inputs)
+  const mockDiagnoses = [
     {
       condition: 'Common Cold',
       confidence: 'High',
@@ -60,4 +64,19 @@ export async function getDiagnosis(symptoms: Symptom[], medicalHistory: MedicalH
       confidence: 'Medium',
     },
   ];
+
+  if (age < 18) {
+    mockDiagnoses.push({
+      condition: 'Pediatric Viral Infection',
+      confidence: 'Low',
+    });
+  } else if (age > 65) {
+     mockDiagnoses.push({
+      condition: 'Age-related Condition Check',
+      confidence: 'Low',
+    });
+  }
+
+
+  return mockDiagnoses;
 }
